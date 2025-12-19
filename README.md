@@ -12,9 +12,7 @@
 We are excited to introduce **Qwen-Image-Layered**, a model capable of decomposing an image into multiple RGBA layers. This layered representation unlocks **inherent editability**: each layer can be independently manipulated without affecting other content. Meanwhile, such a layered representation naturally supports **high-fidelity elementary operations**-such as resizing, reposition, and recoloring. By physically isolating semantic or structural components into distinct layers, our approach enables high-fidelity and consistent editing.
 
 
-<div align="center">
-  <video src="https://www.youtube.com/embed/OVhmiBrsziQ?si=84DVzNVRnS0tIFOR" width="70%"> </video>
-</div>
+[![Qwen Image Layered](https://img.youtube.com/vi/OVhmiBrsziQ/0.jpg)](https://www.youtube.com/watch?v=OVhmiBrsziQ)
 
 
 ## News
