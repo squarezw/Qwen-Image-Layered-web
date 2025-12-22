@@ -8,6 +8,7 @@ import uuid
 import numpy as np
 import random
 import tempfile
+import zipfile 
 
 MAX_SEED = np.iinfo(np.int32).max
 
@@ -88,8 +89,26 @@ def infer(input_image,
         output = pipeline(**inputs)
         output_images = output.images[0]
     
-    return output_images
-
+    output = []
+    temp_files = []
+    for i, image in enumerate(output_images):
+        output.append(image)
+        # Save to temp file for export
+        tmp = tempfile.NamedTemporaryFile(suffix=".png", delete=False)
+        image.save(tmp.name)
+        temp_files.append(tmp.name)
+    
+    # Generate PPTX
+    pptx_path = imagelist_to_pptx(temp_files)
+    
+    # Generate ZIP
+    with tempfile.NamedTemporaryFile(suffix=".zip", delete=False) as tmp:
+        with zipfile.ZipFile(tmp.name, 'w', zipfile.ZIP_DEFLATED) as zipf:
+            for i, img_path in enumerate(temp_files):
+                zipf.write(img_path, f"layer_{i+1}.png")
+        zip_path = tmp.name
+    
+    return output, pptx_path, zip_path
 
 examples = [
             "assets/test_images/1.png",
@@ -115,35 +134,33 @@ with gr.Blocks() as demo:
                     The text prompt is intended to describe the overall content of the input image—including elements that may be partially occluded (e.g., you may specify the text hidden behind a foreground object). It is not designed to control the semantic content of individual layers explicitly.
                     """)
         with gr.Row():
-            with gr.Column():
+            with gr.Column(scale=1):
                 input_image = gr.Image(label="Input Image", image_mode="RGBA")
                 
-            with gr.Column():
-                seed = gr.Slider(
-                    label="Seed",
-                    minimum=0,
-                    maximum=MAX_SEED,
-                    step=1,
-                    value=0,
-                )
-
-                randomize_seed = gr.Checkbox(label="Randomize seed", value=True)
-
-
-                prompt = gr.Textbox(
-                    label="Prompt (Optional)",
-                    placeholder="Please enter the prompt to describe the image. (Optional)",
-                    value="",
-                    lines=2,
-                )
-                neg_prompt = gr.Textbox(
-                    label="Negative Prompt (Optional)",
-                    placeholder="Please enter the negative prompt",
-                    value=" ",
-                    lines=2,
-                )
                 
-                with gr.Row():
+                with gr.Accordion("Advanced Settings", open=False):
+                    prompt = gr.Textbox(
+                        label="Prompt (Optional)",
+                        placeholder="Please enter the prompt to describe the image. It is not designed to control the semantic content of individual layers explicitly. (Optional)",
+                        value="",
+                        lines=3,
+                    )
+                    neg_prompt = gr.Textbox(
+                        label="Negative Prompt (Optional)",
+                        placeholder="Please enter the negative prompt",
+                        value=" ",
+                        lines=3,
+                    )
+                    
+                    seed = gr.Slider(
+                        label="Seed",
+                        minimum=0,
+                        maximum=MAX_SEED,
+                        step=1,
+                        value=0,
+                    )
+                    randomize_seed = gr.Checkbox(label="Randomize seed", value=True)
+                    
                     true_guidance_scale = gr.Slider(
                         label="True guidance scale",
                         minimum=1.0,
@@ -168,29 +185,24 @@ with gr.Blocks() as demo:
                         value=4,
                     )
 
-                with gr.Row():
                     cfg_norm = gr.Checkbox(label="Whether enable CFG normalization", value=True)
                     use_en_prompt = gr.Checkbox(label="Automatic caption language if no prompt provided, True for EN, False for ZH", value=True)
                 
-                with gr.Row():
-                    run_button = gr.Button("Decompose!", variant="primary")
+                run_button = gr.Button("Decompose!", variant="primary")
 
-        gallery = gr.Gallery(label="Layers", columns=4, rows=1, format="png")
-        export_btn = gr.Button("Export as PPTX")
-        export_file = gr.File(label="Download PPTX")
-        export_btn.click(
-            fn=export_gallery,
-            inputs=gallery,
-            outputs=export_file
-        )
+            with gr.Column(scale=2):
+                gallery = gr.Gallery(label="Layers", columns=4, rows=1, format="png")
+                with gr.Row():
+                    export_file = gr.File(label="Download PPTX")
+                    export_zip_file = gr.File(label="Download ZIP")
 
     gr.Examples(examples=examples,
-                    inputs=[input_image], 
-                    outputs=[gallery], 
-                    fn=infer, 
-                    examples_per_page=14,
-                    cache_examples=False,
-                    run_on_click=True
+                inputs=[input_image], 
+                outputs=[gallery, export_file, export_zip_file],
+                fn=infer, 
+                examples_per_page=14,
+                cache_examples=False,
+                run_on_click=True
     )
 
     run_button.click(
@@ -206,8 +218,8 @@ with gr.Blocks() as demo:
             layer,
             cfg_norm,
             use_en_prompt,
-        ],
-        outputs=gallery,
+        ], 
+        outputs=[gallery, export_file, export_zip_file],
     )
 
 demo.launch(
